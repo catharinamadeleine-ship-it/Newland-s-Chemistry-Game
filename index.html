@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Newlands' Periodic Octave: Modern Educational Journey</title>
     <style>
         body {
@@ -13,13 +13,18 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            width: 100vw;
             font-family: Arial, sans-serif;
             overflow: hidden;
+            touch-action: none;
         }
         canvas {
             border: 3px solid #00e6ff;
             box-shadow: 0 0 25px rgba(0, 230, 255, 0.3);
             background-color: #191e3c;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -31,15 +36,14 @@
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        let gameState = 0; // 0: Menu, 1: Intro Materi, 2: Simulasi Drag & Drop, 4: Selesai + SPU Oktaf
+        let gameState = 0; // 0: Menu, 1: Intro Materi, 2: Simulasi, 4: Selesai
         let current_stage = 1;
-        let score = 0;
+        let score = 0; // Nilai akhir maksimum 100 (tiap stage bernilai 25 poin jika benar)
         let feedback_msg = "";
         let show_edu_popup = false;
         let edu_content = { title: "", lines: [] };
         let selected_card = null;
-        let mouseX = 0;
-        let mouseY = 0;
+        let answered_stages = {}; // Melacak stage yang sudah dijawab benar agar skor tidak dihitung dua kali
 
         const RUBRIK_DATA = {
             1: {
@@ -126,7 +130,6 @@
 
         let current_cards = [];
 
-        // Load Asset Gambar (Opsional/Fallback aman jika file lokal belum ada)
         let bgImg = new Image();
         bgImg.src = "lab_bg.jpg";
         let bgLoaded = false;
@@ -137,57 +140,68 @@
         let avatarLoaded = false;
         avatarImg.onload = () => { avatarLoaded = true; };
 
-        canvas.addEventListener("mousemove", (e) => {
+        function getCanvasCoordinates(e) {
             const rect = canvas.getBoundingClientRect();
-            mouseX = e.clientX - rect.left;
-            mouseY = e.clientY - rect.top;
+            const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
 
-            if (selected_card) {
-                selected_card.x = mouseX - 70;
-                selected_card.y = mouseY - 40;
-            }
-        });
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
 
-        canvas.addEventListener("mousedown", () => {
+        function handleStart(x, y) {
             if (show_edu_popup) {
-                if (mouseX >= 350 && mouseX <= 550 && mouseY >= 440 && mouseY <= 485) {
+                if (x >= 350 && x <= 550 && y >= 440 && y <= 485) {
                     show_edu_popup = false;
                 }
                 return;
             }
 
             if (gameState === 0) {
-                if (mouseX >= 300 && mouseX <= 600 && mouseY >= 450 && mouseY <= 520) {
+                if (x >= 300 && x <= 600 && y >= 450 && y <= 520) {
                     gameState = 1;
                     current_stage = 1;
                     score = 0;
+                    answered_stages = {};
                 }
             } else if (gameState === 1) {
-                if (mouseX >= 300 && mouseX <= 600 && mouseY >= 520 && mouseY <= 580) {
+                if (x >= 300 && x <= 600 && y >= 520 && y <= 580) {
                     gameState = 2;
                     current_cards = RUBRIK_DATA[current_stage].cards.map(c => ({...c}));
                     feedback_msg = "";
-                } else if (mouseX >= 60 && mouseX <= 260 && mouseY >= 520 && mouseY <= 580) {
+                } else if (x >= 60 && x <= 260 && y >= 520 && y <= 580) {
                     show_edu_popup = true;
                     edu_content = RUBRIK_DATA[current_stage].edu_popup;
                 }
             } else if (gameState === 2) {
                 for (let card of current_cards) {
-                    if (mouseX >= card.x && mouseX <= card.x + 140 && mouseY >= card.y && mouseY <= card.y + 80) {
+                    if (x >= card.x && x <= card.x + 140 && y >= card.y && y <= card.y + 80) {
                         selected_card = card;
                         break;
                     }
                 }
             } else if (gameState === 4) {
-                if (mouseX >= 330 && mouseX <= 570 && mouseY >= 560 && mouseY <= 615) {
+                if (x >= 330 && x <= 570 && y >= 560 && y <= 615) {
                     gameState = 0;
                 }
             }
-        });
+        }
 
-        canvas.addEventListener("mouseup", () => {
+        function handleMove(x, y) {
+            if (selected_card) {
+                selected_card.x = x - 70;
+                selected_card.y = y - 40;
+            }
+        }
+
+        function handleEnd(x, y) {
             if (gameState === 2 && selected_card) {
-                if (mouseX >= 230 && mouseX <= 670 && mouseY >= 200 && mouseY <= 340) {
+                if (x >= 230 && x <= 670 && y >= 200 && y <= 340) {
                     let is_correct = false;
 
                     if (current_stage === 1) {
@@ -222,14 +236,21 @@
                         if (current_stage > 1 && !selected_card.valid) {
                             feedback_msg = "Tepat! Pengecualian berhasil diidentifikasi.";
                         } else {
-                            score += 25; // Perbaikan: Error tag[cite: 8] sudah dibersihkan
                             feedback_msg = "Benar sekali! Pilihan tepat.";
                         }
+
+                        // Berikan poin 25 hanya jika stage ini belum pernah dijawab benar sebelumnya, dan batas max 100
+                        if (!answered_stages[current_stage]) {
+                            answered_stages[current_stage] = true;
+                            score = Math.min(100, score + 25);
+                        }
+
                         current_cards = current_cards.filter(c => c !== selected_card);
                     } else {
+                        // JIKA SALAH: Poin TIDAK DIKURANGI, kartu dikembalikan ke posisi semula
                         selected_card.x = selected_card.orig_x;
                         selected_card.y = selected_card.orig_y;
-                        feedback_msg = "Posisi salah, coba lagi!";
+                        feedback_msg = "Posisi salah, coba lagi! (Nilai aman)";
                     }
 
                     selected_card = null;
@@ -248,7 +269,15 @@
                     selected_card = null;
                 }
             }
-        });
+        }
+
+        canvas.addEventListener("mousedown", (e) => { let pos = getCanvasCoordinates(e); handleStart(pos.x, pos.y); });
+        canvas.addEventListener("mousemove", (e) => { let pos = getCanvasCoordinates(e); handleMove(pos.x, pos.y); });
+        canvas.addEventListener("mouseup", (e) => { let pos = getCanvasCoordinates(e); handleEnd(pos.x, pos.y); });
+
+        canvas.addEventListener("touchstart", (e) => { e.preventDefault(); let pos = getCanvasCoordinates(e); handleStart(pos.x, pos.y); }, { passive: false });
+        canvas.addEventListener("touchmove", (e) => { e.preventDefault(); let pos = getCanvasCoordinates(e); handleMove(pos.x, pos.y); }, { passive: false });
+        canvas.addEventListener("touchend", (e) => { e.preventDefault(); let pos = getCanvasCoordinates(e); handleEnd(pos.x, pos.y); }, { passive: false });
 
         function drawPeriodicTableOctave() {
             ctx.fillStyle = "rgba(20, 25, 50, 0.95)";
@@ -443,7 +472,7 @@
 
                 ctx.fillStyle = "#ffdc00";
                 ctx.font = "bold 16px Arial";
-                ctx.fillText(`Total Nilai Eksperimen Kamu: ${score} / 100`, canvas.width / 2, 90);
+                ctx.fillText(`Total Nilai Akhir Kamu: ${score} / 100`, canvas.width / 2, 90);
 
                 ctx.fillStyle = "#ff3282";
                 ctx.fillRect(330, 560, 240, 55);
