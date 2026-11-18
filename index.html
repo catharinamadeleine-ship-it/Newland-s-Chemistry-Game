@@ -16,7 +16,7 @@
             width: 100vw;
             font-family: Arial, sans-serif;
             overflow: hidden;
-            touch-action: none;
+            touch-action: none; /* Mencegah layar scroll saat drag di HP */
         }
         canvas {
             border: 3px solid #00e6ff;
@@ -36,20 +36,20 @@
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        let gameState = 0; // 0: Menu, 1: Intro Materi, 2: Simulasi, 4: Selesai
+        let gameState = 0; // 0: Menu, 1: Intro Materi, 2: Simulasi Drag & Drop, 4: Selesai
         let current_stage = 1;
-        let score = 0; // Nilai akhir maksimum 100 (tiap stage bernilai 25 poin jika benar)
+        let score = 0;
         let feedback_msg = "";
         let show_edu_popup = false;
         let edu_content = { title: "", lines: [] };
         let selected_card = null;
-        let answered_stages = {}; // Melacak stage yang sudah dijawab benar agar skor tidak dihitung dua kali
+        let answered_stages = {};
 
         const RUBRIK_DATA = {
             1: {
                 title: "POIN 1: Biografi John Newlands",
                 intro: "John Alexander Reina Newlands (1837-1898) adalah kimiawan asal Inggris.\nIa merupakan ilmuwan pertama yang menyusun unsur\nberdasarkan nomor massa atom\ndan menemukan keteraturan sifat yang\nberulang secara periodik.\n\nATURAN: Wajib susun unsur dari massa\nterkecil ke terbesar (H -> Li -> Be -> B)!",
-                dialog: "Kenali kisahku! Susun dari massa atom terkecil dulu ya.",
+                dialog: "Kenali kisahku! Seret kartu massa atom terkecil ke kotak atas.",
                 header: "STAGE 1: Biografi & Massa Atom Berurutan",
                 cards: [
                     { name: "H (Massa 1)", x: 80, y: 480, orig_x: 80, orig_y: 480, valid: true },
@@ -70,8 +70,8 @@
             },
             2: {
                 title: "POIN 2: Teori & Sejarah Hukum Oktaf",
-                intro: "Teori Oktaf Newlands (1864): Jika unsur disusun menurut kenaikan massa atom,\nsifat unsur ke-8 akan mirip dengan unsur ke-1 (seperti oktaf musik: Do-Re-Mi-Fa-Sol-La-Si-Do).\n\nATURAN: Taro unsur yang cocok/benar dulu,\nbaru terakhir taruh kartu pengecualian!",
-                dialog: "Taro Na (yang cocok) dulu,\nbaru terakhir taro Fe (pengecualian)!",
+                intro: "Teori Oktaf Newlands (1864): Jika unsur disusun menurut kenaikan massa atom,\nsifat unsur ke-8 akan mirip dengan unsur ke-1 (seperti oktaf musik: Do-Re-Mi-Fa-Sol-La-Si-Do).\n\nATURAN: Seret unsur yang cocok/benar dulu ke atas,\nbaru terakhir seret kartu pengecualian!",
+                dialog: "Seret Na (yang cocok) dulu ke kotak atas,\nbaru terakhir seret Fe (pengecualian)!",
                 header: "STAGE 2: Hukum Oktaf & Pengulangan Sifat",
                 cards: [
                     { name: "Na (Mirip Li)", x: 220, y: 480, orig_x: 220, orig_y: 480, valid: true },
@@ -89,8 +89,8 @@
             },
             3: {
                 title: "POIN 3 & 4: Kelebihan & Kelemahan Tabel Newlands",
-                intro: "Kelebihan: Merintis konsep keperiodikan sifat unsur.\nKelemahan: Hanya berlaku untuk unsur ringan (sampai Kalsium/Ca).\nUnsur berat (seperti Fe) dipaksakan masuk ke kelompok non-logam.\n\nATURAN: Taro Cl (yang cocok) dulu,\nbaru terakhir taro Fe (pengecualian)!",
-                dialog: "Taro Cl (yang cocok) dulu,\nbaru terakhir taro Fe (pengecualian)!",
+                intro: "Kelebihan: Merintis konsep keperiodikan sifat unsur.\nKelemahan: Hanya berlaku untuk unsur ringan (sampai Kalsium/Ca).\nUnsur berat (seperti Fe) dipaksakan masuk ke kelompok non-logam.\n\nATURAN: Seret Cl (yang cocok) dulu ke atas,\nbaru terakhir seret Fe (pengecualian)!",
+                dialog: "Seret Cl (yang cocok) dulu ke kotak atas,\nbaru terakhir seret Fe (pengecualian)!",
                 header: "STAGE 3: Analisis Kelebihan & Kelemahan",
                 cards: [
                     { name: "CI (Klorin)", x: 220, y: 480, orig_x: 220, orig_y: 480, valid: true },
@@ -108,8 +108,8 @@
             },
             4: {
                 title: "POIN 5: Nilai SERVIAM (Individu & Kelompok)",
-                intro: "Nilai Serviam Tokoh & Tim:\n1. Ketangguhan (Persistence) & Integritas.\n2. Keberanian mengemukakan ide kreatif dalam kelompok.\n3. Kerjasama tim yang jujur & saling mendukung.\n\nATURAN: Taro pilihan Serviam yang benar dulu,\nbaru terakhir taro pilihan yang salah!",
-                dialog: "Taro nilai Serviam yang benar dulu,\nbaru terakhir taro keputusasaan!",
+                intro: "Nilai Serviam Tokoh & Tim:\n1. Ketangguhan (Persistence) & Integritas.\n2. Keberanian mengemukakan ide kreatif dalam kelompok.\n3. Kerjasama tim yang jujur & saling mendukung.\n\nATURAN: Seret pilihan Serviam yang benar dulu ke atas,\nbaru terakhir seret pilihan yang salah!",
+                dialog: "Seret nilai Serviam yang benar dulu ke kotak atas,\nbaru terakhir seret keputusasaan!",
                 header: "STAGE 4: Refleksi Nilai Serviam",
                 cards: [
                     { name: "Integritas & Keberanian Tim", x: 160, y: 480, orig_x: 160, orig_y: 480, valid: true },
@@ -154,7 +154,8 @@
             };
         }
 
-        function handleStart(x, y) {
+        // --- DRAG & DROP HANDLERS ---
+        function handleDragStart(x, y) {
             if (show_edu_popup) {
                 if (x >= 350 && x <= 550 && y >= 440 && y <= 485) {
                     show_edu_popup = false;
@@ -192,15 +193,16 @@
             }
         }
 
-        function handleMove(x, y) {
+        function handleDragMove(x, y) {
             if (selected_card) {
                 selected_card.x = x - 70;
                 selected_card.y = y - 40;
             }
         }
 
-        function handleEnd(x, y) {
+        function handleDragEnd(x, y) {
             if (gameState === 2 && selected_card) {
+                // Cek apakah kartu dilepas di dalam kotak target atas (x: 230-670, y: 200-340)
                 if (x >= 230 && x <= 670 && y >= 200 && y <= 340) {
                     let is_correct = false;
 
@@ -239,7 +241,6 @@
                             feedback_msg = "Benar sekali! Pilihan tepat.";
                         }
 
-                        // Berikan poin 25 hanya jika stage ini belum pernah dijawab benar sebelumnya, dan batas max 100
                         if (!answered_stages[current_stage]) {
                             answered_stages[current_stage] = true;
                             score = Math.min(100, score + 25);
@@ -247,7 +248,6 @@
 
                         current_cards = current_cards.filter(c => c !== selected_card);
                     } else {
-                        // JIKA SALAH: Poin TIDAK DIKURANGI, kartu dikembalikan ke posisi semula
                         selected_card.x = selected_card.orig_x;
                         selected_card.y = selected_card.orig_y;
                         feedback_msg = "Posisi salah, coba lagi! (Nilai aman)";
@@ -271,13 +271,29 @@
             }
         }
 
-        canvas.addEventListener("mousedown", (e) => { let pos = getCanvasCoordinates(e); handleStart(pos.x, pos.y); });
-        canvas.addEventListener("mousemove", (e) => { let pos = getCanvasCoordinates(e); handleMove(pos.x, pos.y); });
-        canvas.addEventListener("mouseup", (e) => { let pos = getCanvasCoordinates(e); handleEnd(pos.x, pos.y); });
+        // Mouse Events
+        canvas.addEventListener("mousedown", (e) => { let pos = getCanvasCoordinates(e); handleDragStart(pos.x, pos.y); });
+        canvas.addEventListener("mousemove", (e) => { let pos = getCanvasCoordinates(e); handleDragMove(pos.x, pos.y); });
+        canvas.addEventListener("mouseup", (e) => { let pos = getCanvasCoordinates(e); handleDragEnd(pos.x, pos.y); });
 
-        canvas.addEventListener("touchstart", (e) => { e.preventDefault(); let pos = getCanvasCoordinates(e); handleStart(pos.x, pos.y); }, { passive: false });
-        canvas.addEventListener("touchmove", (e) => { e.preventDefault(); let pos = getCanvasCoordinates(e); handleMove(pos.x, pos.y); }, { passive: false });
-        canvas.addEventListener("touchend", (e) => { e.preventDefault(); let pos = getCanvasCoordinates(e); handleEnd(pos.x, pos.y); }, { passive: false });
+        // Touch Events untuk HP & Tablet (Dioptimalkan dengan { passive: false })
+        canvas.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            let pos = getCanvasCoordinates(e);
+            handleDragStart(pos.x, pos.y);
+        }, { passive: false });
+
+        canvas.addEventListener("touchmove", (e) => {
+            e.preventDefault();
+            let pos = getCanvasCoordinates(e);
+            handleDragMove(pos.x, pos.y);
+        }, { passive: false });
+
+        canvas.addEventListener("touchend", (e) => {
+            e.preventDefault();
+            let pos = getCanvasCoordinates(e);
+            handleDragEnd(pos.x, pos.y);
+        }, { passive: false });
 
         function drawPeriodicTableOctave() {
             ctx.fillStyle = "rgba(20, 25, 50, 0.95)";
@@ -432,7 +448,7 @@
                 ctx.fillStyle = "#ff8200";
                 ctx.font = "bold 16px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("--- TARUH KARTU DI SINI ---", canvas.width / 2, 255);
+                ctx.fillText("--- SERET KARTU KE KOTAK INI ---", canvas.width / 2, 255);
 
                 ctx.fillStyle = "#ffdc00";
                 ctx.font = "bold 26px Arial";
