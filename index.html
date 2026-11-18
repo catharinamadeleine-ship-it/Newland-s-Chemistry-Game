@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newlands' Periodic Octave: Modern Educational Journey</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #191e3c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 3px solid #00e6ff;
+            box-shadow: 0 0 25px rgba(0, 230, 255, 0.3);
+            background-color: #191e3c;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="900" height="680"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let gameState = 0; // 0: Menu, 1: Intro Materi, 2: Simulasi Drag & Drop, 4: Selesai + SPU Oktaf
+        let current_stage = 1;
+        let score = 0;
+        let feedback_msg = "";
+        let show_edu_popup = false;
+        let edu_content = { title: "", lines: [] };
+        let selected_card = null;
+        let mouseX = 0;
+        let mouseY = 0;
+
+        const RUBRIK_DATA = {
+            1: {
+                title: "POIN 1: Biografi John Newlands",
+                intro: "John Alexander Reina Newlands (1837-1898) adalah kimiawan asal Inggris.\nIa merupakan ilmuwan pertama yang menyusun unsur\nberdasarkan nomor massa atom\ndan menemukan keteraturan sifat yang\nberulang secara periodik.\n\nATURAN: Wajib susun unsur dari massa\nterkecil ke terbesar (H -> Li -> Be -> B)!",
+                dialog: "Kenali kisahku! Susun dari massa atom terkecil dulu ya.",
+                header: "STAGE 1: Biografi & Massa Atom Berurutan",
+                cards: [
+                    { name: "H (Massa 1)", x: 80, y: 480, orig_x: 80, orig_y: 480, valid: true },
+                    { name: "Li (Massa 7)", x: 240, y: 480, orig_x: 240, orig_y: 480, valid: true },
+                    { name: "Be (Massa 9)", x: 400, y: 480, orig_x: 400, orig_y: 480, valid: true },
+                    { name: "B (Massa 11)", x: 560, y: 480, orig_x: 560, orig_y: 480, valid: true }
+                ],
+                edu_popup: {
+                    title: "BIOGRAFI JOHN NEWLANDS",
+                    lines: [
+                        "• Nama Lengkap: John Alexander Reina Newlands",
+                        "• Lahir: London, 26 November 1837",
+                        "• Pendidikan: Royal College of Chemistry, London",
+                        "• Kontribusi Utama: Mengumumkan 'Hukum Oktaf' pada tahun 1864-1865.",
+                        "• Penghargaan: Medali Davy oleh Royal Society pada tahun 1887 atas karyanya."
+                    ]
+                }
+            },
+            2: {
+                title: "POIN 2: Teori & Sejarah Hukum Oktaf",
+                intro: "Teori Oktaf Newlands (1864): Jika unsur disusun menurut kenaikan massa atom,\nsifat unsur ke-8 akan mirip dengan unsur ke-1 (seperti oktaf musik: Do-Re-Mi-Fa-Sol-La-Si-Do).\n\nATURAN: Taro unsur yang cocok/benar dulu,\nbaru terakhir taruh kartu pengecualian!",
+                dialog: "Taro Na (yang cocok) dulu,\nbaru terakhir taro Fe (pengecualian)!",
+                header: "STAGE 2: Hukum Oktaf & Pengulangan Sifat",
+                cards: [
+                    { name: "Na (Mirip Li)", x: 220, y: 480, orig_x: 220, orig_y: 480, valid: true },
+                    { name: "Fe (Pengecualian)", x: 500, y: 480, orig_x: 500, orig_y: 480, valid: false }
+                ],
+                edu_popup: {
+                    title: "TEORI & SEJARAH HUKUM OKTAF",
+                    lines: [
+                        "• Konsep: Setiap pengulangan 8 unsur, sifat fisika & kimia berulang.",
+                        "• Analog Musik: Didasarkan pada susunan tangga nada musik (oktaf).",
+                        "• ATURAN MAIN: Masukkan unsur yang cocok terlebih dahulu,",
+                        "  baru terakhir tandai kartu pengecualian/jebakan."
+                    ]
+                }
+            },
+            3: {
+                title: "POIN 3 & 4: Kelebihan & Kelemahan Tabel Newlands",
+                intro: "Kelebihan: Merintis konsep keperiodikan sifat unsur.\nKelemahan: Hanya berlaku untuk unsur ringan (sampai Kalsium/Ca).\nUnsur berat (seperti Fe) dipaksakan masuk ke kelompok non-logam.\n\nATURAN: Taro Cl (yang cocok) dulu,\nbaru terakhir taro Fe (pengecualian)!",
+                dialog: "Taro Cl (yang cocok) dulu,\nbaru terakhir taro Fe (pengecualian)!",
+                header: "STAGE 3: Analisis Kelebihan & Kelemahan",
+                cards: [
+                    { name: "CI (Klorin)", x: 220, y: 480, orig_x: 220, orig_y: 480, valid: true },
+                    { name: "Fe (Pengecualian)", x: 500, y: 480, orig_x: 500, orig_y: 480, valid: false }
+                ],
+                edu_popup: {
+                    title: "KELEBIHAN & KELEMAHAN",
+                    lines: [
+                        "► KELEBIHAN: Menjadi dasar awal pengembangan Tabel Periodik Modern.",
+                        "► KELEMAHAN: Gagal untuk unsur berat & memaksakan penempatan.",
+                        "• ATURAN MAIN: Masukkan unsur yang cocok (Cl) terlebih dahulu,",
+                        "  baru terakhir masukkan kartu pengecualian (Fe)."
+                    ]
+                }
+            },
+            4: {
+                title: "POIN 5: Nilai SERVIAM (Individu & Kelompok)",
+                intro: "Nilai Serviam Tokoh & Tim:\n1. Ketangguhan (Persistence) & Integritas.\n2. Keberanian mengemukakan ide kreatif dalam kelompok.\n3. Kerjasama tim yang jujur & saling mendukung.\n\nATURAN: Taro pilihan Serviam yang benar dulu,\nbaru terakhir taro pilihan yang salah!",
+                dialog: "Taro nilai Serviam yang benar dulu,\nbaru terakhir taro keputusasaan!",
+                header: "STAGE 4: Refleksi Nilai Serviam",
+                cards: [
+                    { name: "Integritas & Keberanian Tim", x: 160, y: 480, orig_x: 160, orig_y: 480, valid: true },
+                    { name: "Keputusasaan", x: 520, y: 480, orig_x: 520, orig_y: 480, valid: false }
+                ],
+                edu_popup: {
+                    title: "NILAI SERVIAM DALAM KELOMPOK",
+                    lines: [
+                        "• Ketangguhan & Integritas: Mengerjakan tugas dengan jujur dan tangguh.",
+                        "• Keberanian Berpendapat: Saling berani mengemukakan ide kreatif",
+                        "  masing-masing anggota dalam tim.",
+                        "• ATURAN MAIN: Masukkan nilai Serviam yang benar terlebih dahulu,",
+                        "  baru terakhir masukkan pilihan yang salah."
+                    ]
+                }
+            }
+        };
+
+        let current_cards = [];
+
+        // Load Asset Gambar (Opsional/Fallback aman jika file lokal belum ada)
+        let bgImg = new Image();
+        bgImg.src = "lab_bg.jpg";
+        let bgLoaded = false;
+        bgImg.onload = () => { bgLoaded = true; };
+
+        let avatarImg = new Image();
+        avatarImg.src = "newlands.png.png";
+        let avatarLoaded = false;
+        avatarImg.onload = () => { avatarLoaded = true; };
+
+        canvas.addEventListener("mousemove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+
+            if (selected_card) {
+                selected_card.x = mouseX - 70;
+                selected_card.y = mouseY - 40;
+            }
+        });
+
+        canvas.addEventListener("mousedown", () => {
+            if (show_edu_popup) {
+                if (mouseX >= 350 && mouseX <= 550 && mouseY >= 440 && mouseY <= 485) {
+                    show_edu_popup = false;
+                }
+                return;
+            }
+
+            if (gameState === 0) {
+                if (mouseX >= 300 && mouseX <= 600 && mouseY >= 450 && mouseY <= 520) {
+                    gameState = 1;
+                    current_stage = 1;
+                    score = 0;
+                }
+            } else if (gameState === 1) {
+                if (mouseX >= 300 && mouseX <= 600 && mouseY >= 520 && mouseY <= 580) {
+                    gameState = 2;
+                    current_cards = RUBRIK_DATA[current_stage].cards.map(c => ({...c}));
+                    feedback_msg = "";
+                } else if (mouseX >= 60 && mouseX <= 260 && mouseY >= 520 && mouseY <= 580) {
+                    show_edu_popup = true;
+                    edu_content = RUBRIK_DATA[current_stage].edu_popup;
+                }
+            } else if (gameState === 2) {
+                for (let card of current_cards) {
+                    if (mouseX >= card.x && mouseX <= card.x + 140 && mouseY >= card.y && mouseY <= card.y + 80) {
+                        selected_card = card;
+                        break;
+                    }
+                }
+            } else if (gameState === 4) {
+                if (mouseX >= 330 && mouseX <= 570 && mouseY >= 560 && mouseY <= 615) {
+                    gameState = 0;
+                }
+            }
+        });
+
+        canvas.addEventListener("mouseup", () => {
+            if (gameState === 2 && selected_card) {
+                if (mouseX >= 230 && mouseX <= 670 && mouseY >= 200 && mouseY <= 340) {
+                    let is_correct = false;
+
+                    if (current_stage === 1) {
+                        let min_card = current_cards.reduce((prev, curr) => prev.orig_x < curr.orig_x ? prev : curr);
+                        if (selected_card === min_card) {
+                            is_correct = true;
+                        } else {
+                            selected_card.x = selected_card.orig_x;
+                            selected_card.y = selected_card.orig_y;
+                            feedback_msg = "Urutkan dari massa atom terkecil dulu (H -> Li -> Be -> B)!";
+                            selected_card = null;
+                            return;
+                        }
+                    } else {
+                        let other_valid_left = current_cards.some(c => c.valid && c !== selected_card);
+                        if (selected_card.valid) {
+                            is_correct = true;
+                        } else {
+                            if (other_valid_left) {
+                                selected_card.x = selected_card.orig_x;
+                                selected_card.y = selected_card.orig_y;
+                                feedback_msg = "Taro yang cocok/benar dulu, baru terakhir yang pengecualian!";
+                                selected_card = null;
+                                return;
+                            } else {
+                                is_correct = true;
+                            }
+                        }
+                    }
+
+                    if (is_correct) {
+                        if (current_stage > 1 && !selected_card.valid) {
+                            feedback_msg = "Tepat! Pengecualian berhasil diidentifikasi.";
+                        } else {
+                            score += 25; // Perbaikan: Error tag[cite: 8] sudah dibersihkan
+                            feedback_msg = "Benar sekali! Pilihan tepat.";
+                        }
+                        current_cards = current_cards.filter(c => c !== selected_card);
+                    } else {
+                        selected_card.x = selected_card.orig_x;
+                        selected_card.y = selected_card.orig_y;
+                        feedback_msg = "Posisi salah, coba lagi!";
+                    }
+
+                    selected_card = null;
+
+                    if (current_cards.length === 0) {
+                        if (current_stage < 4) {
+                            current_stage += 1;
+                            gameState = 1;
+                        } else {
+                            gameState = 4;
+                        }
+                    }
+                } else {
+                    selected_card.x = selected_card.orig_x;
+                    selected_card.y = selected_card.orig_y;
+                    selected_card = null;
+                }
+            }
+        });
+
+        function drawPeriodicTableOctave() {
+            ctx.fillStyle = "rgba(20, 25, 50, 0.95)";
+            ctx.fillRect(30, 150, 840, 390);
+            ctx.strokeStyle = "#ffdc00";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(30, 150, 840, 390);
+
+            ctx.fillStyle = "#ffdc00";
+            ctx.font = "bold 20px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("TABEL PERIODIK OKTAF NEWLANDS (1865)", canvas.width / 2, 185);
+
+            const columns = ["Do (1)", "Re (2)", "Mi (3)", "Fa (4)", "Sol (5)", "La (6)", "Si (7)"];
+            const data = [
+                ["H", "Li", "Be", "B", "C", "N", "O"],
+                ["F", "Na", "Mg", "Al", "Si", "P", "S"],
+                ["CI", "K", "Ca", "Cr", "Ti", "Mn", "Fe"],
+                ["Co/Ni", "Cu", "Zn", "Y", "In", "As", "Se"]
+            ];
+
+            let start_x = 60, start_y = 210, cw = 105, ch = 34;
+
+            for (let c_idx = 0; c_idx < columns.length; c_idx++) {
+                ctx.fillStyle = "#aa50ff";
+                ctx.fillRect(start_x + (c_idx * cw), start_y, cw - 5, ch);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 13px Arial";
+                ctx.textAlign = "left";
+                ctx.fillText(columns[c_idx], start_x + (c_idx * cw) + 12, start_y + 22);
+            }
+
+            for (let r_idx = 0; r_idx < data.length; r_idx++) {
+                for (let c_idx = 0; c_idx < data[r_idx].length; c_idx++) {
+                    let val = data[r_idx][c_idx];
+                    ctx.fillStyle = "#23284b";
+                    ctx.fillRect(start_x + (c_idx * cw), start_y + 42 + (r_idx * ch), cw - 5, ch - 5);
+
+                    ctx.fillStyle = (val === "Fe" || val.includes("/")) ? "#00e6ff" : "#ffffff";
+                    ctx.font = "13px Arial";
+                    ctx.fillText(val, start_x + (c_idx * cw) + 14, start_y + 49 + (r_idx * ch) + 15);
+                }
+            }
+
+            ctx.fillStyle = "#ff3282";
+            ctx.font = "11px Arial";
+            ctx.fillText("*Catatan: Co/Ni dalam satu sel, dan Fe dipaksakan sejajar O/S (Kelemahan Teori)", 60, 515);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (bgLoaded) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = "#191e3c";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            if (gameState === 0) {
+                ctx.fillStyle = "rgba(20, 25, 55, 0.9)";
+                ctx.fillRect(80, 120, 740, 160);
+                ctx.strokeStyle = "#ffdc00";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(80, 120, 740, 160);
+
+                ctx.fillStyle = "#ffdc00";
+                ctx.font = "bold 26px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("PETUALANGAN SAINS: HUKUM OKTAF NEWLANDS", canvas.width / 2, 175);
+
+                ctx.fillStyle = "#00e6ff";
+                ctx.font = "bold 20px Arial";
+                ctx.fillText("Game Edukasi Kimia & Media Pembelajaran SPU", canvas.width / 2, 230);
+
+                ctx.fillStyle = "#00f08c";
+                ctx.fillRect(300, 450, 300, 70);
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(300, 450, 300, 70);
+
+                ctx.fillStyle = "#0f0f19";
+                ctx.font = "bold 20px Arial";
+                ctx.fillText("MULAI GAME", canvas.width / 2, 492);
+            } else if (gameState === 1) {
+                ctx.fillStyle = "rgba(25, 30, 65, 0.95)";
+                ctx.fillRect(60, 80, 780, 400);
+                ctx.strokeStyle = "#00e6ff";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(60, 80, 780, 400);
+
+                let stage_info = RUBRIK_DATA[current_stage];
+                ctx.fillStyle = "#ffdc00";
+                ctx.font = "bold 26px Arial";
+                ctx.textAlign = "left";
+                ctx.fillText(stage_info.title, 90, 130);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "16px Arial";
+                let lines = stage_info.intro.split("\n");
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], 90, 180 + (i * 28));
+                }
+
+                ctx.fillStyle = "#aa50ff";
+                ctx.fillRect(60, 520, 200, 55);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 18px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("BACA MATERI", 160, 554);
+
+                ctx.fillStyle = "#ff8200";
+                ctx.fillRect(300, 520, 300, 55);
+                ctx.fillStyle = "#0f0f19";
+                ctx.fillText("MASUK SIMULASI", 450, 554);
+            } else if (gameState === 2) {
+                let st_data = RUBRIK_DATA[current_stage];
+
+                ctx.fillStyle = "#23284b";
+                ctx.fillRect(30, 340, 130, 160);
+
+                if (avatarLoaded) {
+                    ctx.drawImage(avatarImg, 40, 345, 110, 150);
+                } else {
+                    ctx.fillStyle = "#ffdc00";
+                    ctx.font = "14px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillText("Newlands", 95, 420);
+                }
+
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(180, 340, 680, 90);
+                ctx.strokeStyle = "#00e6ff";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(180, 340, 680, 90);
+
+                ctx.fillStyle = "#0f0f19";
+                ctx.font = "13px Arial";
+                ctx.textAlign = "left";
+                let dlgLines = st_data.dialog.split("\n");
+                for (let i = 0; i < dlgLines.length; i++) {
+                    ctx.fillText(dlgLines[i], 200, 372 + (i * 20));
+                }
+
+                ctx.fillStyle = "#23284b";
+                ctx.fillRect(230, 180, 440, 130);
+                ctx.strokeStyle = "#ff8200";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(230, 180, 440, 130);
+
+                ctx.fillStyle = "#ff8200";
+                ctx.font = "bold 16px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("--- TARUH KARTU DI SINI ---", canvas.width / 2, 255);
+
+                ctx.fillStyle = "#ffdc00";
+                ctx.font = "bold 26px Arial";
+                ctx.fillText(st_data.header, canvas.width / 2, 45);
+
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#00f08c";
+                ctx.font = "bold 16px Arial";
+                ctx.fillText(`Skor: ${score}`, 30, 30);
+
+                if (feedback_msg) {
+                    ctx.textAlign = "center";
+                    ctx.fillStyle = "#ff3282";
+                    ctx.font = "bold 16px Arial";
+                    ctx.fillText(feedback_msg, canvas.width / 2, 130);
+                }
+
+                for (let card of current_cards) {
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(card.x, card.y, 140, 75);
+                    ctx.strokeStyle = "#00e6ff";
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(card.x, card.y, 140, 75);
+
+                    ctx.fillStyle = "#0f0f19";
+                    ctx.font = "13px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillText(card.name, card.x + 70, card.y + 43);
+                }
+            } else if (gameState === 4) {
+                drawPeriodicTableOctave();
+
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#00f08c";
+                ctx.font = "bold 26px Arial";
+                ctx.fillText("PETUALANGAN SELESAI!", canvas.width / 2, 45);
+
+                ctx.fillStyle = "#ffdc00";
+                ctx.font = "bold 16px Arial";
+                ctx.fillText(`Total Nilai Eksperimen Kamu: ${score} / 100`, canvas.width / 2, 90);
+
+                ctx.fillStyle = "#ff3282";
+                ctx.fillRect(330, 560, 240, 55);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 18px Arial";
+                ctx.fillText("MAIN LAGI", canvas.width / 2, 594);
+            }
+
+            if (show_edu_popup) {
+                ctx.fillStyle = "rgba(15, 20, 45, 0.98)";
+                ctx.fillRect(110, 130, 680, 380);
+                ctx.strokeStyle = "#00e6ff";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(110, 130, 680, 380);
+
+                ctx.fillStyle = "#ffdc00";
+                ctx.font = "bold 20px Arial";
+                ctx.textAlign = "left";
+                ctx.fillText(edu_content.title, 140, 175);
+
+                ctx.strokeStyle = "#00e6ff";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(140, 195);
+                ctx.lineTo(760, 195);
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "13px Arial";
+                for (let idx = 0; idx < edu_content.lines.length; idx++) {
+                    ctx.fillText(edu_content.lines[idx], 140, 225 + (idx * 30));
+                }
+
+                ctx.fillStyle = "#00f08c";
+                ctx.fillRect(350, 440, 200, 45);
+                ctx.fillStyle = "#0f0f19";
+                ctx.font = "bold 18px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("PAHAMI & LANJUT", 450, 470);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
